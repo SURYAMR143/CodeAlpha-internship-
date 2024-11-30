@@ -1,0 +1,26 @@
+#complete code done using R Studio 
+
+data(iris)
+
+head(iris)
+summary(iris)
+
+# Set a seed for reproducibility
+set.seed(123)
+
+# Create a random sample of 80% of the data for training
+train_index <- sample(1:nrow(iris), 0.8 * nrow(iris))
+train_data <- iris[train_index, ]
+test_data <- iris[-train_index, ]
+
+predict_class <- function(new_data, train_data) {
+  distances <- apply(train_data[, 1:4], 1, function(x) sqrt(sum((new_data - x)^2)))
+  nearest_neighbor <- train_data[which.min(distances), ]
+  return(nearest_neighbor$Species)
+}
+
+# Predict on the test data
+predictions <- apply(test_data[, 1:4], 1, function(x) predict_class(x, train_data))
+
+accuracy <- sum(predictions == test_data$Species) / nrow(test_data)
+print(paste("Accuracy:", accuracy))
