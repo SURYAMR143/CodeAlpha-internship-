@@ -1,0 +1,340 @@
+# Function to encode categorical variables
+
+encode_categorical <- function(data, column) {
+
+ factors <- as.factor(data[[column]])
+
+ return(as.numeric(factors))
+
+}
+
+
+
+# Function to normalize numerical variables
+
+normalize <- function(x) {
+
+ return((x - mean(x)) / sd(x))
+
+}
+
+
+
+# Read the data
+
+car_data <- read.csv("car data.csv")
+
+
+
+car_data<-na.omit(car_data)
+
+
+
+# Data pre processing
+
+# Calculate vehicle age
+
+current_year <- 2024
+
+car_data$vehicle_age <- current_year - car_data$Year
+
+
+
+# Encode categorical variables
+
+car_data$fuel_type_encoded <- encode_categorical(car_data, "Fuel_Type")
+
+car_data$transmission_encoded <- encode_categorical(car_data, "Transmission")
+
+car_data$selling_type_encoded <- encode_categorical(car_data, "Selling_type")
+
+
+
+# Normalize numerical variables
+
+car_data$present_price_norm <- normalize(car_data$Present_Price)
+
+car_data$driven_kms_norm <- normalize(car_data$Driven_kms)
+
+car_data$vehicle_age_norm <- normalize(car_data$vehicle_age)
+
+car_data$owner_norm <- normalize(car_data$Owner)
+
+
+
+# Create feature matrix for model
+
+model_data <- data.frame(
+
+ present_price = car_data$present_price_norm,
+
+ driven_kms = car_data$driven_kms_norm,
+
+ vehicle_age = car_data$vehicle_age_norm,
+
+ owner = car_data$owner_norm,
+
+ fuel_type = car_data$fuel_type_encoded,
+
+ transmission = car_data$transmission_encoded,
+
+ selling_type = car_data$selling_type_encoded
+
+)
+
+
+
+print("number of rows in dataset:")
+
+print(nrow(model_data))
+
+
+
+car_data$Selling_Price<-as.numeric(car_data$Selling_Price)
+
+
+
+if(any(is.na(car_data$Selling_Price))){
+
+ print("Warning: Found NA values in salling price")
+
+ car_data<-car_data[!is.na(car_data$Selling_Price),]
+
+}
+
+
+
+car_data$Selling_Price<-as.numeric(car_data$Selling_Price)
+
+
+
+set.seed(123)  # For reproducibility
+
+
+
+train_indices <-sample(1:nrow(car_data),0.7*nrow(car_data))
+
+train_data <- model_data[train_indices, ]
+
+test_data <- model_data[-train_indices, ]
+
+train_price <- car_data$Selling_type[train_indices]
+
+test_price <- car_data$Selling_price[-train_indices]
+
+
+
+car_model <-lm(present_price~.,data = train_data)
+
+
+
+# Print model summary
+
+summary(car_model)
+
+
+
+# Function to calculate R-squared
+
+calculate_r_squared <- function(actual, predicted) {
+
+ ss_res <- sum((actual - predicted)^2)
+
+ ss_tot <- sum((actual - mean(actual))^2)
+
+ r2 <- 1 - (ss_res/ss_tot)
+
+ return(r2)
+
+}
+
+
+
+# Function to calculate RMSE
+
+calculate_rmse <- function(actual, predicted) {
+
+ rmse <- sqrt(mean((actual - predicted)^2))
+
+ return(rmse)
+
+}
+
+
+
+# Make predictions on test data
+
+predictions <- predict(car_model, test_data)
+
+
+
+# Calculate performance metrics
+
+test_r2 <- calculate_r_squared(test_price, predictions)
+
+test_rmse <- calculate_rmse(test_price, predictions)
+
+
+
+# Print performance metrics
+
+cat("\nModel Performance on Test Data:\n")
+
+cat("R-squared:", round(test_r2, 4), "\n")
+
+cat("RMSE:", round(test_rmse, 2), "\n")
+
+
+
+# Function to predict price for a new car
+
+predict_car_price <- function(new_car) {
+
+ # Normalize numerical variables
+
+ new_car$present_price <- (new_car$present_price - mean(car_data$present_price)) / sd(car_data$present_price)
+
+ new_car$driven_kms <- (new_car$driven_kms - mean(car_data$driven_kms)) / sd(car_data$driven_kms)
+
+ new_car$vehicle_age <- (current_year - new_car$year - mean(car_data$vehicle_age)) / sd(car_data$vehicle_age)
+
+ new_car$owner <- (new_car$owner - mean(car_data$owner)) / sd(car_data$owner)
+
+ 
+
+ # Encode categorical variables
+
+ new_car$fuel_type <- match(new_car$fuel_type, levels(as.factor(car_data$fuel_type)))
+
+ new_car$transmission <- match(new_car$transmission, levels(as.factor(car_data$transmission)))
+
+ new_car$selling_type <- match(new_car$selling_type, levels(as.factor(car_data$selling_type)))
+
+ 
+
+ # Make prediction
+
+ new_data <- data.frame(
+
+  present_price = new_car$present_price,
+
+  driven_kms = new_car$driven_kms,
+
+  vehicle_age = new_car$vehicle_age,
+
+  owner = new_car$owner,
+
+  fuel_type = new_car$fuel_type,
+
+  transmission = new_car$transmission,
+
+  selling_type = new_car$selling_type
+
+ )
+
+ 
+
+ predicted_price <- predict(car_model, new_data)
+
+ return(predicted_price)
+
+}
+
+
+
+# Example usage of prediction function
+
+new_car <- data.frame(
+
+ year = 2020,
+
+ present_price = 10.5,
+
+ driven_kms = 15000,
+
+ owner = 1,
+
+ fuel_type = "Petrol",
+
+ transmission = "Manual",
+
+ selling_type = "Individual"
+
+)
+
+
+
+predicted_price <- predict_car_price(new_car)
+
+predicted_price
+
+cat("\nPredicted price for the new car:", round(predicted_price, 2), "\n")
+
+
+
+# Visualize actual vs predicted prices
+
+plot(test_price, predictions,
+
+     main = "Actual vs Predicted Car Prices",
+
+     xlab = "Actual Price",
+
+     ylab = "Predicted Price",
+
+     pch = 16,
+
+     col = "blue")
+
+abline(a = 0, b = 1, col = "red", lwd = 2)
+
+
+
+# Plot residuals
+
+residuals <- test_price - predictions
+
+plot(predictions, residuals,
+
+     main = "Residual Plot",
+
+     xlab = "Predicted Price",
+
+     ylab = "Residuals",
+
+     pch = 16,
+
+     col = "blue")
+
+abline(h = 0, col = "red", lwd = 2)
+
+
+
+# Feature importance (using absolute t-values from the model summary)
+
+coefficients <- summary(car_model)$coefficients
+
+feature_importance <- abs(coefficients[-1, "t value"])
+
+feature_names <- rownames(coefficients)[-1]
+
+
+
+# Create bar plot of feature importance
+
+barplot(feature_importance,
+
+        names.arg = feature_names,
+
+        main = "Feature Importance",
+
+        xlab = "Features",
+
+        ylab = "Absolute t-value",
+
+        col = "skyblue",
+
+        las = 2)
+
+
+
